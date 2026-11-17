@@ -1,0 +1,86 @@
+[build-system]
+requires = ["setuptools>=68.0", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "astravisionx"
+version = "2.0.0"
+description = "Multimodal Computer Vision Platform with Explainable AI & Conversational Intelligence"
+readme = "README.md"
+license = {text = "MIT"}
+requires-python = ">=3.10"
+authors = [
+    {name = "Gaurav"},
+]
+keywords = [
+    "computer-vision",
+    "explainable-ai",
+    "xai",
+    "object-detection",
+    "yolo",
+    "grad-cam",
+    "lime",
+    "integrated-gradients",
+    "vision-transformer",
+]
+classifiers = [
+    "Development Status :: 4 - Beta",
+    "Intended Audience :: Science/Research",
+    "License :: OSI Approved :: MIT License",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Topic :: Scientific/Engineering :: Artificial Intelligence",
+    "Topic :: Scientific/Engineering :: Image Recognition",
+]
+
+dependencies = [
+    "torch",
+    "torchvision",
+    "torchaudio",
+    "fastapi",
+    "uvicorn[standard]",
+    "ultralytics",
+    "timm",
+    "opencv-python",
+    "langchain",
+    "langchain-google-genai",
+    "google-generativeai",
+    "faiss-cpu",
+    "pydantic-settings",
+    "python-multipart",
+    "transformers",
+    "accelerate",
+    "httpx",
+    "reportlab",
+    "shap",
+    "lime",
+    "scikit-image",
+    "scipy",
+    "scikit-learn",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest",
+    "pytest-cov",
+    "ruff",
+]
+
+[project.urls]
+Homepage = "https://github.com/yourusername/AstraVisionX"
+Repository = "https://github.com/yourusername/AstraVisionX"
+Issues = "https://github.com/yourusername/AstraVisionX/issues"
+
+[tool.setuptools.packages.find]
+include = ["astravisionx*"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+python_files = ["test_*.py"]
+
+[tool.ruff]
+target-version = "py310"
+line-length = 120
+

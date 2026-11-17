@@ -1,0 +1,525 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="description" content="AstraVisionX — AI-powered visual analysis dashboard combining YOLOv8 real-time object detection, ViT scene classification, and explainable AI (Grad-CAM, SHAP, LIME)." />
+  <title>AstraVisionX — Real-Time Object Detection & Explainable AI</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/static/style.css?v=2.3" />
+  <style>
+    /* Inline Fallback & Cache-Proof Light Theme Core */
+    :root {
+      --bg-canvas: #F8FAFC;
+      --bg-card: #FFFFFF;
+      --bg-card-subtle: #F1F5F9;
+      --bg-card-hover: #F8FAFC;
+      --border-card: #E2E8F0;
+      --border-subtle: #CBD5E1;
+      --card-shadow: 0 1px 3px 0 rgba(0, 0, 0, 0.05), 0 1px 2px -1px rgba(0, 0, 0, 0.04);
+      --card-shadow-md: 0 4px 6px -1px rgba(0, 0, 0, 0.07), 0 2px 4px -2px rgba(0, 0, 0, 0.05);
+      --text-primary: #0F172A;
+      --text-secondary: #475569;
+      --text-muted: #94A3B8;
+      --text-inverse: #FFFFFF;
+      --accent-primary: #6366F1;
+      --accent-hover: #4F46E5;
+      --accent-tint: #EEF2FF;
+      --accent-border: #C7D2FE;
+      --accent-violet: #8B5CF6;
+      --conf-high: #10B981;
+      --conf-high-bg: #ECFDF5;
+      --conf-high-text: #047857;
+      --conf-med-high: #3B82F6;
+      --conf-med-high-bg: #EFF6FF;
+      --conf-med-high-text: #1D4ED8;
+      --conf-med: #F59E0B;
+      --conf-med-bg: #FFFBEB;
+      --conf-med-text: #B45309;
+      --conf-low: #EF4444;
+      --conf-low-bg: #FEF2F2;
+      --conf-low-text: #B91C1C;
+      --badge-uncertain-bg: #FEF3C7;
+      --badge-uncertain-border: #FCD34D;
+      --badge-uncertain-text: #92400E;
+      --radius-sm: 6px;
+      --radius-md: 10px;
+      --radius-lg: 14px;
+      --radius-xl: 18px;
+      --radius-pill: 9999px;
+    }
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    html, body {
+      min-height: 100vh;
+      background-color: #F8FAFC !important;
+      color: #0F172A !important;
+      font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      font-size: 14px;
+      line-height: 1.5;
+    }
+    .app-layout { display: flex; flex-direction: column; min-height: 100vh; background-color: #F8FAFC; }
+    .header-nav {
+      position: sticky; top: 0; z-index: 100; height: 64px;
+      background-color: #FFFFFF; border-bottom: 1px solid #E2E8F0;
+      display: flex; align-items: center; justify-content: space-between;
+      padding: 0 28px; box-shadow: 0 1px 3px 0 rgba(0,0,0,0.05);
+    }
+    .header-nav__left { display: flex; align-items: center; gap: 16px; }
+    .brand-logo { display: flex; align-items: center; gap: 10px; cursor: pointer; }
+    .brand-logo__icon {
+      width: 32px; height: 32px;
+      background: linear-gradient(135deg, #6366F1 0%, #8B5CF6 100%);
+      border-radius: 6px; display: flex; align-items: center; justify-content: center; padding: 4px;
+    }
+    .brand-logo__text { font-size: 1.25rem; font-weight: 700; color: #0F172A; }
+    .brand-logo__accent { color: #6366F1; font-weight: 800; }
+    .header-nav__divider { width: 1px; height: 22px; background-color: #E2E8F0; }
+    .header-nav__tagline { font-size: 0.85rem; font-weight: 500; color: #94A3B8; }
+    .header-nav__right { display: flex; align-items: center; gap: 12px; }
+    .status-pill {
+      display: inline-flex; align-items: center; gap: 7px; padding: 5px 12px;
+      background-color: #ECFDF5; border: 1px solid #A7F3D0; border-radius: 9999px;
+      font-size: 0.78rem; font-weight: 600; color: #047857;
+    }
+    .status-dot {
+      width: 7px; height: 7px; border-radius: 50%; background-color: #10B981;
+      animation: pulse-dot 2s infinite ease-in-out;
+    }
+    .icon-btn {
+      display: inline-flex; align-items: center; gap: 6px; padding: 7px 12px;
+      background-color: #FFFFFF; border: 1px solid #E2E8F0; border-radius: 10px;
+      color: #475569; font-size: 0.82rem; font-weight: 500; cursor: pointer;
+    }
+    .main-content {
+      flex: 1; max-width: 1540px; width: 100%; margin: 0 auto;
+      padding: 24px 28px; display: flex; flex-direction: column; gap: 20px;
+    }
+    .upload-card {
+      background-color: #FFFFFF; border: 2px dashed #E2E8F0; border-radius: 14px;
+      padding: 24px; text-align: center; cursor: pointer; box-shadow: 0 1px 3px 0 rgba(0,0,0,0.05);
+    }
+    .upload-card__content { display: flex; flex-direction: column; align-items: center; gap: 10px; }
+    .upload-card__icon-wrap {
+      width: 52px; height: 52px; border-radius: 50%; background-color: #EEF2FF;
+      display: flex; align-items: center; justify-content: center;
+    }
+    .upload-card__title { font-size: 1rem; font-weight: 600; color: #0F172A; }
+    .upload-card__subtitle { font-size: 0.84rem; color: #475569; }
+    .upload-card__browse { color: #6366F1; font-weight: 600; text-decoration: underline; }
+    .btn-primary {
+      display: inline-flex; align-items: center; gap: 8px; padding: 8px 18px;
+      background-color: #6366F1; color: #FFFFFF; font-size: 0.86rem; font-weight: 600;
+      border-radius: 10px; border: none; cursor: pointer; box-shadow: 0 2px 4px rgba(99, 102, 241, 0.28);
+    }
+    .dashboard-workspace { display: none; flex-direction: column; gap: 20px; }
+    .dashboard-workspace.visible { display: flex; }
+    .dashboard-grid { display: grid; grid-template-columns: 460px 1fr; gap: 20px; }
+    @media (max-width: 1100px) { .dashboard-grid { grid-template-columns: 1fr; } }
+    .dashboard-card {
+      background-color: #FFFFFF; border: 1px solid #E2E8F0; border-radius: 14px;
+      box-shadow: 0 1px 3px 0 rgba(0,0,0,0.05); display: flex; flex-direction: column; overflow: hidden;
+    }
+    .card-header {
+      height: 58px; padding: 0 20px; border-bottom: 1px solid #E2E8F0;
+      display: flex; align-items: center; justify-content: space-between; background-color: #FAFAFC;
+    }
+    .card-header__title-group { display: flex; align-items: center; gap: 10px; }
+    .card-header__title { font-size: 0.98rem; font-weight: 700; color: #0F172A; }
+    .count-badge {
+      display: inline-flex; align-items: center; padding: 2px 9px;
+      background-color: #EEF2FF; color: #6366F1; border: 1px solid #C7D2FE;
+      border-radius: 9999px; font-size: 0.74rem; font-weight: 700;
+    }
+    .chat-bar-card {
+      background-color: #FFFFFF; border: 1px solid #E2E8F0; border-radius: 14px;
+      box-shadow: 0 1px 3px 0 rgba(0,0,0,0.05); display: flex; flex-direction: column; overflow: hidden;
+    }
+    .card-body.image-viewport {
+      background-color: #F8FAFC !important;
+      min-height: 480px;
+    }
+    .image-stage {
+      background: radial-gradient(circle at 50% 50%, #FFFFFF 0%, #F1F5F9 100%) !important;
+      padding: 16px;
+    }
+    .viewport-legend {
+      background-color: #FAFAFC !important;
+      border-top: 1px solid #E2E8F0 !important;
+      color: #475569 !important;
+    }
+    .legend-item {
+      color: #475569 !important;
+    }
+    .app-footer {
+      display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap;
+      gap: 10px; padding: 16px 28px; background-color: #FFFFFF; border-top: 1px solid #E2E8F0;
+      font-size: 0.78rem; color: #94A3B8;
+    }
+  </style>
+</head>
+<body>
+
+  <!-- App Wrapper -->
+  <div class="app-layout">
+
+    <!-- Top Navigation Header -->
+    <header class="header-nav">
+      <div class="header-nav__left">
+        <div class="brand-logo" id="brandLogoHome">
+          <div class="brand-logo__icon">
+            <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+              <path d="M12 3L3 21H7.5L9.5 16.5H14.5L16.5 21H21L12 3Z" fill="white" />
+              <path d="M12 8.5L10.5 13H13.5L12 8.5Z" fill="#EEF2FF" />
+            </svg>
+          </div>
+          <div class="brand-logo__text">
+            AstraVision<span class="brand-logo__accent">X</span>
+          </div>
+        </div>
+        <div class="header-nav__divider"></div>
+        <div class="header-nav__tagline">
+          Real-Time Object Detection <span class="bullet">·</span> Explainable AI
+        </div>
+      </div>
+
+      <div class="header-nav__right">
+        <div class="status-pill" id="modelStatusPill" title="Detection Engine Active">
+          <span class="status-dot"></span>
+          <span class="status-text" id="modelStatusText">YOLOv8 Active</span>
+        </div>
+        
+        <button type="button" class="icon-btn" id="btnUploadNew" title="Upload New Image">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
+            <polyline points="17 8 12 3 7 8"></polyline>
+            <line x1="12" y1="3" x2="12" y2="15"></line>
+          </svg>
+          <span class="btn-text">Upload</span>
+        </button>
+
+        <button type="button" class="icon-btn" id="downloadPdfBtn" title="Export PDF Report" disabled>
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
+            <polyline points="14 2 14 8 20 8"></polyline>
+            <line x1="16" y1="13" x2="8" y2="13"></line>
+            <line x1="16" y1="17" x2="8" y2="17"></line>
+            <polyline points="10 9 9 9 8 9"></polyline>
+          </svg>
+          <span class="btn-text">Report</span>
+        </button>
+
+        <button type="button" class="icon-btn" id="fullscreenBtn" title="Toggle Fullscreen">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M8 3H5a2 2 0 0 0-2 2v3m18 0V5a2 2 0 0 0-2-2h-3m0 18h3a2 2 0 0 0 2-2v-3M3 16v3a2 2 0 0 0 2 2h3"></path>
+          </svg>
+        </button>
+      </div>
+    </header>
+
+    <!-- Main Container -->
+    <main class="main-content">
+      
+      <!-- Upload Dropzone Card (Visible initially & collapsible) -->
+      <section class="upload-card" id="uploadZone">
+        <input type="file" accept="image/*" class="upload-card__input" id="fileInput" />
+        <div class="upload-card__content">
+          <div class="upload-card__icon-wrap">
+            <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="#6366F1" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect>
+              <circle cx="8.5" cy="8.5" r="1.5"></circle>
+              <polyline points="21 15 16 10 5 21"></polyline>
+            </svg>
+          </div>
+          <div class="upload-card__text">
+            <h3 class="upload-card__title">Upload an image to start visual analysis</h3>
+            <p class="upload-card__subtitle">Drag and drop here, or <span class="upload-card__browse">browse files</span> · PNG, JPEG, WebP supported</p>
+          </div>
+          <div class="upload-card__preview" id="previewContainer">
+            <img id="previewImage" src="" alt="Image preview" />
+            <div class="upload-card__meta">
+              <span class="upload-card__filename" id="fileName">sample.jpg</span>
+              <button type="button" class="btn-primary" id="analyzeBtn">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                  <polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"></polygon>
+                </svg>
+                Analyze Image
+              </button>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- Error Toast -->
+      <div class="error-banner" id="errorBanner"></div>
+
+      <!-- Dashboard Workspace (Visible when analysis is loaded) -->
+      <div class="dashboard-workspace" id="reportChatLayout">
+        
+        <!-- Summary & Disclaimer Mini Bar -->
+        <div class="workspace-banner">
+          <div class="workspace-banner__summary" id="aiSummaryStats">
+            <!-- Stats pills injected here -->
+          </div>
+          <div class="workspace-banner__disclaimer" id="disclaimerBanner">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"></circle><line x1="12" y1="16" x2="12" y2="12"></line><line x1="12" y1="8" x2="12.01" y2="8"></line></svg>
+            <span>Research & educational analysis only — not a clinical diagnostic tool.</span>
+          </div>
+        </div>
+
+        <!-- 2-Column Main Dashboard Grid -->
+        <div class="dashboard-grid">
+          
+          <!-- LEFT PANEL: Detected Objects Card -->
+          <section class="dashboard-card panel-left" id="detectedObjectsPanel">
+            <div class="card-header">
+              <div class="card-header__title-group">
+                <div class="card-header__icon">
+                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#6366F1" stroke-width="2">
+                    <path d="M4 7V4h3M20 7V4h-3M4 17v3h3M20 17v3h-3M9 12h6M12 9v6"></path>
+                  </svg>
+                </div>
+                <h2 class="card-header__title">Detected Objects</h2>
+                <span class="count-badge" id="detectedCountBadge">0 Objects</span>
+              </div>
+              <div class="card-header__actions">
+                <button type="button" class="btn-reset-view" id="resetViewBtn" title="Reset image focus and zoom">
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <polyline points="1 4 1 10 7 10"></polyline>
+                    <path d="M3.51 15a9 9 0 1 0 2.13-9.36L1 10"></path>
+                  </svg>
+                  Reset Focus
+                </button>
+              </div>
+            </div>
+
+            <!-- Objects Table Body -->
+            <div class="card-body table-scroll">
+              <table class="objects-table" id="detectionsTable">
+                <thead>
+                  <tr>
+                    <th class="col-index">#</th>
+                    <th class="col-class">Class</th>
+                    <th class="col-confidence">Confidence</th>
+                  </tr>
+                </thead>
+                <tbody id="detectionsBody">
+                  <!-- Detection rows injected by JS -->
+                </tbody>
+              </table>
+            </div>
+
+            <!-- Additional Scene Context Collapsible -->
+            <details class="scene-context-accordion" id="sceneAccordion">
+              <summary class="scene-context-summary">
+                <div class="scene-context-summary__title">
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <circle cx="12" cy="12" r="10"></circle>
+                    <path d="M12 2a14.5 14.5 0 0 0 0 20 14.5 14.5 0 0 0 0-20"></path>
+                    <path d="M2 12h20"></path>
+                  </svg>
+                  <span>ViT Scene Classification & Explainability Details</span>
+                </div>
+                <span class="accordion-arrow">▼</span>
+              </summary>
+              <div class="scene-context-content">
+                <table class="objects-table sub-table" id="classificationsTable">
+                  <thead>
+                    <tr>
+                      <th>Rank</th>
+                      <th>Class Prediction</th>
+                      <th>Confidence</th>
+                    </tr>
+                  </thead>
+                  <tbody id="classificationsBody"></tbody>
+                </table>
+                <div class="gradcam-pills-row" id="gradcamPills"></div>
+                <div class="confidence-breakdown-box" id="confidenceBreakdownBox"></div>
+              </div>
+            </details>
+          </section>
+
+          <!-- RIGHT PANEL: Image / YOLO Detections Card -->
+          <section class="dashboard-card panel-right" id="imageViewerPanel">
+            <div class="card-header">
+              <div class="card-header__title-group">
+                <div class="card-header__icon">
+                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#6366F1" stroke-width="2">
+                    <circle cx="12" cy="12" r="10"></circle>
+                    <line x1="22" y1="12" x2="18" y2="12"></line>
+                    <line x1="6" y1="12" x2="2" y2="12"></line>
+                    <line x1="12" y1="6" x2="12" y2="2"></line>
+                    <line x1="12" y1="22" x2="12" y2="18"></line>
+                  </svg>
+                </div>
+                <h2 class="card-header__title" id="imagePanelTitle">YOLO Detections</h2>
+              </div>
+              
+              <!-- Right Controls: XAI Method Tabs + Overlay Toggle -->
+              <div class="card-header__controls">
+                <div class="xai-method-selector" id="xaiMethodSelector" title="Select Explainability Method">
+                  <button type="button" class="xai-tab active" data-method="gradcam">Grad-CAM</button>
+                  <button type="button" class="xai-tab" data-method="shap">SHAP</button>
+                  <button type="button" class="xai-tab" data-method="lime">LIME</button>
+                </div>
+
+                <label class="toggle-switch" title="Toggle heatmap visualization overlay in-place">
+                  <span class="toggle-switch__label">View Overlay</span>
+                  <div class="toggle-switch__track">
+                    <input type="checkbox" id="overlayToggle" />
+                    <span class="toggle-switch__thumb"></span>
+                  </div>
+                </label>
+              </div>
+            </div>
+
+            <!-- Interactive Unified Viewport -->
+            <div class="card-body image-viewport" id="imageViewport">
+              <div class="image-stage" id="imageStage">
+                <div class="zoom-layer" id="zoomLayer">
+                  <!-- Base Image -->
+                  <img id="imgOriginal" src="" alt="Analyzed scene" class="stage-image stage-image--base" />
+                  
+                  <!-- Dynamic SVG / HTML Bounding Box & Label Overlay -->
+                  <div id="bboxOverlayContainer" class="bbox-overlay-container"></div>
+                  
+                  <!-- Grad-CAM / SHAP / LIME Overlay with Smooth Crossfade -->
+                  <img id="imgGradcamOverlay" src="" alt="Explainability Overlay" class="stage-image stage-image--gradcam" />
+                </div>
+              </div>
+              
+              <!-- Color Legend Bar -->
+              <div class="viewport-legend">
+                <span class="legend-item"><span class="legend-dot dot--high"></span> ≥80% High</span>
+                <span class="legend-item"><span class="legend-dot dot--med-high"></span> 65-79% Good</span>
+                <span class="legend-item"><span class="legend-dot dot--med"></span> 50-64% Moderate</span>
+                <span class="legend-item"><span class="legend-dot dot--low"></span> &lt;50% Uncertain</span>
+                <span class="legend-divider">|</span>
+                <span class="method-info-badge" id="currentMethodBadge">Grad-CAM Overlay</span>
+              </div>
+            </div>
+          </section>
+
+        </div> <!-- /.dashboard-grid -->
+
+        <!-- BOTTOM PANEL: Astra AI Chat Bar -->
+        <section class="chat-bar-card" id="chatPanel">
+          
+          <!-- Chat Feed Accordion / Drawer -->
+          <div class="chat-feed-drawer" id="chatFeedDrawer">
+            <div class="chat-feed-drawer__header">
+              <div class="chat-feed-drawer__title">
+                <span>💬 Conversation History</span>
+                <span class="chat-session-badge" id="chatSessionId"></span>
+              </div>
+              <div class="chat-feed-drawer__actions">
+                <button type="button" class="voice-toggle-btn active" id="voiceToggleBtn" title="Mute Assistant Voice">🔊</button>
+                <button type="button" class="icon-btn-sm" id="chatDrawerClose" title="Minimize Chat History">
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="6 9 12 15 18 9"></polyline></svg>
+                </button>
+              </div>
+            </div>
+            
+            <div class="chat-messages-container" id="chatMessages">
+              <div class="chat-msg chat-msg--assistant">
+                <div class="chat-msg__avatar">✨</div>
+                <div class="chat-msg__content">
+                  <div class="chat-msg__bubble">
+                    Hello! I'm your Astra AI assistant. Ask me questions about detections, confidence scores, or model explainability.
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <div class="chat-typing-indicator" id="chatTyping">
+              <div class="typing-dots">
+                <span></span><span></span><span></span>
+              </div>
+              <span class="typing-text">Astra AI is analyzing…</span>
+            </div>
+          </div>
+
+          <!-- Horizontal Input Bar -->
+          <div class="chat-bar-main">
+            <div class="chat-bar-brand" id="chatBrandTrigger" title="Click to view full conversation history">
+              <div class="chat-bar-avatar">
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#6366F1" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                  <path d="M12 2v4M12 18v4M4.93 4.93l2.83 2.83M16.24 16.24l2.83 2.83M2 12h4M18 12h4M4.93 19.07l2.83-2.83M16.24 7.76l2.83-2.83"></path>
+                </svg>
+              </div>
+              <div class="chat-bar-info">
+                <div class="chat-bar-name">Astra AI</div>
+                <div class="chat-bar-sub">Ask anything about the detections</div>
+              </div>
+            </div>
+
+            <!-- Single Line Form -->
+            <form class="chat-bar-form" id="chatForm">
+              <button type="button" class="mic-btn" id="micBtn" title="Use Voice Input">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                  <path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"></path>
+                  <path d="M19 10v2a7 7 0 0 1-14 0v-2"></path>
+                  <line x1="12" y1="19" x2="12" y2="23"></line>
+                  <line x1="8" y1="23" x2="16" y2="23"></line>
+                </svg>
+              </button>
+              <input type="text" id="chatInput" placeholder="Ask a question about the detections, Grad-CAM, or uncertainty…" autocomplete="off" />
+              <button type="submit" id="chatSendBtn" class="chat-send-btn" title="Send Question">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+                  <line x1="22" y1="2" x2="11" y2="13"></line>
+                  <polygon points="22 2 15 22 11 13 2 9 22 2"></polygon>
+                </svg>
+              </button>
+            </form>
+          </div>
+
+          <!-- Suggested Prompt Chips Row -->
+          <div class="suggested-chips-row" id="suggestedChipsRow">
+            <span class="chips-label">Suggested:</span>
+            <button type="button" class="chip-btn" data-prompt="Why is this detected as this class?">
+              <span>🔍</span> Why was this object detected?
+            </button>
+            <button type="button" class="chip-btn" data-prompt="What is Grad-CAM showing in the image?">
+              <span>🔥</span> What is Grad-CAM showing?
+            </button>
+            <button type="button" class="chip-btn" data-prompt="Explain the prediction confidence and uncertainty breakdown.">
+              <span>📊</span> Explain confidence & uncertainty
+            </button>
+            <button type="button" class="chip-btn" data-prompt="Summarize the overall visual findings and detected objects.">
+              <span>✨</span> Summarize all findings
+            </button>
+          </div>
+
+        </section>
+
+      </div> <!-- /.dashboard-workspace -->
+
+    </main>
+
+    <!-- App Footer -->
+    <footer class="app-footer">
+      <div class="footer-left">
+        <span>AstraVisionX Dashboard</span>
+        <span class="footer-bullet">·</span>
+        <span class="footer-models">YOLOv8 Object Detection · ViT Classifier · Grad-CAM / SHAP / LIME</span>
+      </div>
+      <div class="footer-right">
+        <span class="footer-disclaimer">For research and educational purposes only</span>
+      </div>
+    </footer>
+
+  </div>
+
+  <!-- Loading Fullscreen Overlay -->
+  <div class="loading-overlay" id="loadingOverlay">
+    <div class="loading-card">
+      <div class="loading-spinner"></div>
+      <h3 class="loading-title">Processing Visual Models</h3>
+      <p class="loading-subtitle">Running YOLOv8 detector, ViT feature extraction, and explainability maps…</p>
+    </div>
+  </div>
+
+  <script src="/static/app.js?v=2.7"></script>
+</body>
+</html>

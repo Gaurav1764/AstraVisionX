@@ -1,0 +1,94 @@
+# =============================================
+# AstraVisionX .gitignore
+# =============================================
+
+# ---------- Python ----------
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+*.egg-info/
+*.egg
+dist/
+build/
+*.whl
+
+# ---------- Virtual Environment ----------
+.venv/
+venv/
+env/
+ENV/
+
+# ---------- IDE ----------
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+.project
+.settings/
+*.code-workspace
+
+# ---------- OS ----------
+.DS_Store
+Thumbs.db
+desktop.ini
+*.lnk
+
+# ---------- Secrets & Keys ----------
+.env
+api_keys.txt
+
+# ---------- Model Weights (too large for Git) ----------
+*.pt
+*.pth
+*.onnx
+*.tflite
+*.h5
+*.safetensors
+
+# ---------- Evaluation / Benchmark Data ----------
+eval_dataset_100/
+eval_dataset/
+benchmark_results/
+
+# ---------- Generated Outputs ----------
+*_output.jpg
+*_output.png
+scratch_tray.png
+
+# ---------- Experiment Artifacts ----------
+ablation_results.json
+large_scale_empirical_results.json
+verification_summary.json
+experimental_results_for_paper.md
+
+# ---------- Benchmark Scripts (internal, not part of core) ----------
+benchmark_experiments.py
+run_large_scale_benchmark.py
+download_100_images.py
+download_eval_dataset.py
+investigate_and_fix_metrics.py
+grounding_ablation_experiment.py
+
+# ---------- Other eval data ----------
+eval_dataset/
+
+# ---------- Research Paper (optional — uncomment to include) ----------
+# AstraVisionX_Research_Paper.tex
+# Response_to_Reviewers.md
+
+# ---------- pytest ----------
+.pytest_cache/
+htmlcov/
+.coverage
+coverage.xml
+
+# ---------- Logs ----------
+*.log
+logs/
+
+# ---------- Misc ----------
+*.bak
+*.tmp
+*.temp
