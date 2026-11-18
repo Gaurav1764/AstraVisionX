@@ -39,6 +39,9 @@ class Settings(BaseSettings):
     # Session Settings
     session_ttl_minutes: int = 30
     
+    # Category Filter & Demographic Settings
+    enable_demographic_estimates: bool = False
+    
     # Disclaimer
     medical_disclaimer: str = "For research and educational purposes only — not a diagnostic tool."
     

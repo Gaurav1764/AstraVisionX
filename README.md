@@ -59,15 +59,15 @@ AstraVisionX is an end-to-end multimodal computer vision platform that combines:
 ## Architecture
 
 ```
-┌─────────────────────────────────────────────────────────┐
-│                    Web Frontend (SPA)                     │
+┌──────────────────────────────────────────────────────────┐
+│                    Web Frontend (SPA)                    │
 │              static/index.html + app.js + style.css      │
-└──────────────────────────┬──────────────────────────────┘
+└──────────────────────────┬───────────────────────────────┘
                            │  REST API (FastAPI)
-┌──────────────────────────▼──────────────────────────────┐
+┌──────────────────────────▼───────────────────────────────┐
 │                       app.py                             │
 │  /detect  /analyze  /explain/method  /chat  /report      │
-└───┬───────┬────────┬────────────┬──────────┬────────────┘
+└───┬───────┬────────┬────────────┬──────────┬─────────────┘
     │       │        │            │          │
     ▼       ▼        ▼            ▼          ▼
 ┌──────┐ ┌─────┐ ┌──────────┐ ┌──────┐ ┌────────┐
@@ -83,10 +83,14 @@ AstraVisionX is an end-to-end multimodal computer vision platform that combines:
 
 ## Features
 
-### 🎯 Real-Time Object Detection
+### 🎯 Real-Time Object Detection & Category Filtering
 - YOLOv8s with Open Images V7 checkpoint (601 object categories)
 - Configurable confidence thresholds with uncertainty flagging
 - Annotated bounding-box overlays
+- **Multi-Category Filter Bar**: Instant client-side filtering across `All`, `Persons`, `Clothing`, `Vehicles`, `License Plates`, `Animals`, and `Other`
+- **Parent-Child Visual Nesting**: Bounding-box containment links clothing/body parts to parent persons and license plates to vehicles
+- **Free-Text Search & Confidence Range Slider**: Dynamic multi-parameter filtering
+- **Dim vs. Hide Toggle**: Flexible presentation of non-matching detections on canvas
 
 ### 🧠 Scene Classification
 - ViT-B/16 pretrained on ImageNet-1K (1,000 classes)
@@ -141,7 +145,7 @@ AstraVisionX is an end-to-end multimodal computer vision platform that combines:
 
 ```bash
 # Clone the repository
-git clone https://github.com/yourusername/AstraVisionX.git
+git clone https://github.com/Gaurav1764/AstraVisionX.git
 cd AstraVisionX
 
 # Create virtual environment
@@ -244,7 +248,8 @@ AstraVisionX/
 │   │
 │   ├── models/                     # Detection & classification models
 │   │   ├── yolo_detector.py        # YOLOv8 wrapper (Open Images V7)
-│   │   └── vit_classifier.py       # ViT-B/16 wrapper (ImageNet-1K)
+│   │   ├── vit_classifier.py       # ViT-B/16 wrapper (ImageNet-1K)
+│   │   └── category_map.py         # Category taxonomies & parent-child containment
 │   │
 │   ├── xai/                        # Explainability modules
 │   │   ├── __init__.py             # Public API exports
@@ -326,6 +331,7 @@ All settings are managed via environment variables (`.env` file). See [`.env.exa
 | `VIT_MODEL_NAME` | `vit_base_patch16_224` | ViT model name (timm) |
 | `DETECTOR_CONF_THRESHOLD` | `0.10` | YOLO detection threshold |
 | `MODEL_MODE` | `general` | `general` or `medical` |
+| `ENABLE_DEMOGRAPHIC_ESTIMATES` | `False` | Opt-in visual presentation demographic filters |
 | `GEMINI_API_KEY` | — | Google Gemini API key |
 | `SESSION_TTL_MINUTES` | `30` | Session expiry time |
 

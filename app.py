@@ -33,6 +33,7 @@ from astravisionx.xai.gradcam_explainer import GradCamExplainer
 from astravisionx.xai.shap_explainer import ShapExplainer
 from astravisionx.xai.lime_explainer import LimeExplainer
 from astravisionx.xai.metrics import compute_explanation_agreement, binarize_heatmap
+from astravisionx.models.category_map import enrich_detections
 from astravisionx.utils.image_utils import (
     apply_colormap_on_image,
     apply_diverging_colormap,
@@ -155,6 +156,10 @@ async def detect(file: UploadFile = File(...)):
         yolo, _, _, _, _, _ = _get_models()
         detections = yolo.detect(image_rgb)
         detections = _relabel_detections(detections)
+        filter_meta = enrich_detections(
+            detections,
+            enable_demographics=settings.enable_demographic_estimates
+        )
         annotated = draw_detections(image_rgb, detections)
 
         return JSONResponse({
@@ -162,6 +167,10 @@ async def detect(file: UploadFile = File(...)):
             "detections": detections,
             "annotated_image": encode_image_base64(annotated),
             "disclaimer": settings.medical_disclaimer,
+            "category_counts": filter_meta["category_counts"],
+            "demographic_enabled": filter_meta["demographic_enabled"],
+            "demographic_counts": filter_meta["demographic_counts"],
+            "filter_config": filter_meta["filter_config"],
         })
     except Exception as e:
         return JSONResponse({"success": False, "error": str(e)}, status_code=500)
@@ -561,6 +570,10 @@ async def analyze(file: UploadFile = File(...)):
         # 1. YOLO Detection
         detections = yolo.detect(image_rgb)
         detections = _relabel_detections(detections)
+        filter_meta = enrich_detections(
+            detections,
+            enable_demographics=settings.enable_demographic_estimates
+        )
 
         # 2. ViT Classification
         classifications = vit.classify(image_rgb)
@@ -684,6 +697,10 @@ async def analyze(file: UploadFile = File(...)):
             "available_methods": list(session.xai_cache.keys()),
             "nl_summary": nl_summary,
             "disclaimer": settings.medical_disclaimer,
+            "category_counts": filter_meta["category_counts"],
+            "demographic_enabled": filter_meta["demographic_enabled"],
+            "demographic_counts": filter_meta["demographic_counts"],
+            "filter_config": filter_meta["filter_config"],
         })
 
     except Exception as e:
@@ -709,7 +726,11 @@ async def report(session_id: str = Form(...)):
 
 
 @app.post("/chat")
-async def chat_endpoint(session_id: str = Form(...), message: str = Form(...)):
+async def chat_endpoint(
+    session_id: str = Form(...),
+    message: str = Form(...),
+    filters_json: Optional[str] = Form(None),
+):
     """
     Session-scoped conversational Q&A.
     """
@@ -719,6 +740,12 @@ async def chat_endpoint(session_id: str = Form(...), message: str = Form(...)):
             {"success": False, "error": "Session not found or expired. Please re-analyze the image."},
             status_code=404,
         )
+
+    if filters_json:
+        try:
+            session.active_filters = json.loads(filters_json)
+        except Exception:
+            pass
 
     try:
         response = chatbot_chat(session, message)

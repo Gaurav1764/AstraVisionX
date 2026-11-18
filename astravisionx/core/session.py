@@ -30,6 +30,7 @@ class Session:
         self.classifications: list = []
         self.gradcam_info: dict = {}
         self.nl_summary: str = ""
+        self.active_filters: Optional[dict] = None
 
         # Explainability Cache: maps method name ('gradcam', 'shap', 'lime') -> result dict
         self.xai_cache: Dict[str, dict] = {}
@@ -61,14 +62,32 @@ class Session:
         lines = [
             f"Image filename: {self.filename}",
             "",
-            "=== YOLO Object Detections ===",
         ]
+        if self.active_filters:
+            cats = self.active_filters.get("categories", [])
+            query = self.active_filters.get("search_query", "")
+            min_c = self.active_filters.get("min_confidence", 0.0)
+            filter_desc = []
+            if cats:
+                filter_desc.append(f"Categories: {', '.join(cats)}")
+            if query:
+                filter_desc.append(f"Search: '{query}'")
+            if min_c > 0:
+                filter_desc.append(f"Min Confidence: {min_c:.0%}")
+            if filter_desc:
+                lines.append(f"=== Active User View Filter: {' | '.join(filter_desc)} ===")
+                lines.append("")
+
+        lines.append("=== YOLO Object Detections ===")
         if self.detections:
             for i, d in enumerate(self.detections, 1):
+                parent_info = f", parent: det_{d['parent_index']}" if d.get('parent_index') is not None else ""
+                cat_info = f", category: {d.get('category', 'unknown')}"
                 lines.append(
                     f"  {i}. {d.get('class_name', 'unknown')} — "
                     f"confidence {d.get('confidence', 0):.1%}, "
                     f"bbox {[round(v) for v in d.get('bbox', [])]}"
+                    f"{cat_info}{parent_info}"
                 )
         else:
             lines.append("  No objects detected.")

@@ -84,9 +84,19 @@ Key Milestones & System Features Completed:
      image plates, detection tables, classification rankings, XAI explanation summaries, 
      confidence margin breakdowns, and formal disclaimers.
 
-8. Comprehensive Testing & Verification Suite:
-   - Pytest unit and integration test suite (test_confidence.py) validating confidence score 
-     bounds [0.0, 1.0], out-of-distribution relabeling rules, and endpoint contracts.
+8. Category Filtering & Hierarchical Detection Suite:
+   - Comprehensive taxonomy mapper (astravisionx/models/category_map.py) mapping all 601
+     OIV7 classes into Persons, Vehicles, License Plates, Clothing, Animals, and Other.
+   - Bounding-box containment linking (_ioa calculation) attaching clothing/body parts to 
+     parent persons and license plates to parent vehicles with nested visual tags.
+   - Interactive UI filter chips with real-time synchronized counts, search query text filter,
+     confidence range slider, and switchable Dim (12% opacity) vs. Hide canvas modes.
+   - Grounded filter context propagation to Astra AI conversational assistant.
+
+9. Comprehensive Testing & Verification Suite:
+   - Pytest unit and integration test suite (tests/test_confidence.py, tests/test_category_filter.py) 
+     validating confidence score bounds [0.0, 1.0], category grouping, parent-child linking, 
+     demographic estimation rules, and endpoint contracts.
 
 
 ================================================================================

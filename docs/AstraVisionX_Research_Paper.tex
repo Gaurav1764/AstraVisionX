@@ -78,11 +78,11 @@ AstraVisionX is structured into five cohesive architectural layers:
 \end{enumerate}
 
 \subsection{Dual Deep Learning Pipeline}
-\noindent\textbf{Fine-Grained Object Detection.} We deploy YOLOv8s trained on Open Images V7 (601 classes). Given an RGB input image $I \in \mathbb{R}^{H \times W \times 3}$, the detector infers $N$ bounding boxes:
+\noindent\textbf{Fine-Grained Object Detection and Hierarchical Filtering.} We deploy YOLOv8s trained on Open Images V7 (601 classes). Given an RGB input image $I \in \mathbb{R}^{H \times W \times 3}$, the detector infers $N$ bounding boxes:
 \begin{equation}
 B_n = [x_{\min}, y_{\min}, x_{\max}, y_{\max}], \quad c_n \in [0, 1], \quad y_n \in \mathcal{C}_{\text{OI}}
 \end{equation}
-where $c_n$ represents confidence and $\mathcal{C}_{\text{OI}}$ denotes the 601 Open Images classes. To eliminate channel-swapping distortions, arrays are explicitly calibrated from BGR to RGB prior to tensor transformation.
+where $c_n$ represents confidence and $\mathcal{C}_{\text{OI}}$ denotes the 601 Open Images classes. To eliminate channel-swapping distortions, arrays are explicitly calibrated from BGR to RGB prior to tensor transformation. Furthermore, detections are systematically mapped into top-level semantic categories ($\mathcal{T} = \{\text{Persons}, \text{Vehicles}, \text{License Plates}, \text{Clothing}, \text{Animals}, \text{Other}\}$), with parent-child hierarchical containment linking sub-detections (e.g., worn clothing to person; registration plate to vehicle) based on bounding-box containment intersection-over-area ($\text{IoA} \ge 0.50$).
 
 \noindent\textbf{Global Scene Classification.} Simultaneously, global visual semantics are extracted via a Vision Transformer ($\text{ViT-Base-Patch16-224}$) pretrained on ImageNet-1K ($\mathcal{C}_{\text{IN}}$, 1000 classes). Input images are resized to $224 \times 224$ and projected through patch self-attention blocks to produce class probabilities $\mathbf{p} = \text{Softmax}(\mathbf{z})$.
 

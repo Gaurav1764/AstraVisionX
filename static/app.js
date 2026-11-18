@@ -20,6 +20,16 @@
   let activeXaiMethod = "gradcam";
   let xaiCache = {}; // maps `global_method` or `det_INDEX_method` -> result
 
+  // --- Filter State ---
+  let activeFilterCategories = new Set(["all"]);
+  let searchQuery = "";
+  let minConfidenceThreshold = 10;
+  let isDimMode = true; // true = Dim (~15% opacity), false = Hide non-matching boxes
+  let categoryCounts = {};
+  let demographicEnabled = false;
+  let demographicCounts = {};
+  let filterConfig = {};
+
   // --- DOM Refs: Navigation & Upload ---------------------------------------
   const uploadZone       = document.getElementById("uploadZone");
   const fileInput        = document.getElementById("fileInput");
@@ -43,6 +53,20 @@
   const classificationsBody     = document.getElementById("classificationsBody");
   const gradcamPills            = document.getElementById("gradcamPills");
   const confidenceBreakdownBox  = document.getElementById("confidenceBreakdownBox");
+
+  // --- DOM Refs: Category Filter Bar ---
+  const detectionFilterBar          = document.getElementById("detectionFilterBar");
+  const filterChipsRow              = document.getElementById("filterChipsRow");
+  const filterSearchInput           = document.getElementById("filterSearchInput");
+  const clearSearchBtn              = document.getElementById("clearSearchBtn");
+  const filterConfidenceSlider      = document.getElementById("filterConfidenceSlider");
+  const confSliderValue             = document.getElementById("confSliderValue");
+  const dimHideToggle               = document.getElementById("dimHideToggle");
+  const dimHideLabel                = document.getElementById("dimHideLabel");
+  const demographicDisclaimerBanner = document.getElementById("demographicDisclaimerBanner");
+  const filterEmptyState            = document.getElementById("filterEmptyState");
+  const emptyClearFiltersBtn        = document.getElementById("emptyClearFiltersBtn");
+  const detectionsTableContainer    = document.getElementById("detectionsTableContainer");
 
   // --- DOM Refs: Image Viewer & XAI ----------------------------------------
   const imgOriginal             = document.getElementById("imgOriginal");
@@ -275,6 +299,23 @@
       currentSessionId = data.session_id;
       xaiCache = {};
       
+      // Store filter metadata from backend
+      categoryCounts = data.category_counts || {};
+      demographicEnabled = !!data.demographic_enabled;
+      demographicCounts = data.demographic_counts || {};
+      filterConfig = data.filter_config || {};
+      
+      // Reset filter controls to default
+      activeFilterCategories = new Set(["all"]);
+      searchQuery = "";
+      if (filterSearchInput) filterSearchInput.value = "";
+      if (clearSearchBtn) clearSearchBtn.style.display = "none";
+      if (filterConfidenceSlider) {
+        filterConfidenceSlider.value = 10;
+        if (confSliderValue) confSliderValue.textContent = "10%";
+      }
+      minConfidenceThreshold = 10;
+      
       // Store global Grad-CAM
       if (data.gradcam_image) {
         xaiCache["global_gradcam"] = {
@@ -401,7 +442,9 @@
       naturalImgW = imgOriginal.naturalWidth || 1;
       naturalImgH = imgOriginal.naturalHeight || 1;
       croppedThumbnails = generateCroppedThumbnails(imgOriginal, currentDetections);
+      renderFilterChips();
       renderDetectionsTableAndBoxes(currentDetections, naturalImgW, naturalImgH);
+      applyFilter();
       updateSuggestedChips(currentDetections);
     };
 
@@ -477,6 +520,279 @@
   }
 
   // ========================================================================
+  //  CATEGORY FILTER BAR LOGIC
+  // ========================================================================
+  function renderFilterChips() {
+    if (!filterChipsRow) return;
+    filterChipsRow.innerHTML = "";
+
+    const totalCount = currentDetections.length;
+    const chipsData = [
+      { id: "all", label: "All", icon: "✨", count: totalCount },
+      { id: "persons", label: "Persons", icon: "👤", count: categoryCounts.persons || 0 },
+    ];
+
+    // Optional Part C: Male / Female demographic chips (only if enabled)
+    if (demographicEnabled) {
+      chipsData.push(
+        { id: "demo_male", label: "Male (apparent)", icon: "👨", count: demographicCounts.male || 0, isDemo: true },
+        { id: "demo_female", label: "Female (apparent)", icon: "👩", count: demographicCounts.female || 0, isDemo: true },
+        { id: "demo_unclear", label: "Unclear / not estimated", icon: "❓", count: demographicCounts.unclear || 0, isDemo: true }
+      );
+      if (demographicDisclaimerBanner) demographicDisclaimerBanner.style.display = "flex";
+    } else {
+      if (demographicDisclaimerBanner) demographicDisclaimerBanner.style.display = "none";
+    }
+
+    chipsData.push(
+      { id: "clothing", label: "Clothing", icon: "👕", count: categoryCounts.clothing || 0 },
+      { id: "vehicles", label: "Vehicles", icon: "🚗", count: categoryCounts.vehicles || 0 },
+      { id: "license_plates", label: "License Plates", icon: "🔢", count: categoryCounts.license_plates || 0 },
+      { id: "animals", label: "Animals", icon: "🐾", count: categoryCounts.animals || 0 },
+      { id: "other", label: "Other", icon: "📦", count: categoryCounts.other || 0 }
+    );
+
+    chipsData.forEach((chip) => {
+      const btn = document.createElement("button");
+      btn.type = "button";
+      btn.className = "filter-chip";
+      btn.id = `filter-chip-${chip.id}`;
+      btn.setAttribute("data-filter", chip.id);
+      btn.setAttribute("role", "button");
+      btn.setAttribute("tabindex", "0");
+
+      const isActive = activeFilterCategories.has(chip.id);
+      btn.setAttribute("aria-pressed", isActive ? "true" : "false");
+      if (isActive) btn.classList.add("active");
+
+      // Disabled if 0 items, unless it's "all"
+      if (chip.count === 0 && chip.id !== "all") {
+        btn.classList.add("disabled");
+        btn.disabled = true;
+        btn.setAttribute("title", `No ${chip.label} detected`);
+      }
+
+      btn.innerHTML = `
+        <span class="filter-chip__icon">${chip.icon}</span>
+        <span class="filter-chip__label">${chip.label}</span>
+        <span class="filter-chip__count">${chip.count}</span>
+      `;
+
+      btn.addEventListener("click", () => toggleFilterChip(chip.id));
+      btn.addEventListener("keydown", (e) => {
+        if (e.key === "Enter" || e.key === " ") {
+          e.preventDefault();
+          toggleFilterChip(chip.id);
+        }
+      });
+
+      filterChipsRow.appendChild(btn);
+    });
+  }
+
+  function toggleFilterChip(filterId) {
+    if (filterId === "all") {
+      activeFilterCategories.clear();
+      activeFilterCategories.add("all");
+    } else {
+      activeFilterCategories.delete("all");
+      if (activeFilterCategories.has(filterId)) {
+        activeFilterCategories.delete(filterId);
+      } else {
+        activeFilterCategories.add(filterId);
+      }
+      if (activeFilterCategories.size === 0) {
+        activeFilterCategories.add("all");
+      }
+    }
+
+    // Update aria-pressed and classes on all chips
+    const allChips = filterChipsRow.querySelectorAll(".filter-chip");
+    allChips.forEach((chip) => {
+      const fid = chip.getAttribute("data-filter");
+      const isSelected = activeFilterCategories.has(fid);
+      chip.setAttribute("aria-pressed", isSelected ? "true" : "false");
+      if (isSelected) {
+        chip.classList.add("active");
+      } else {
+        chip.classList.remove("active");
+      }
+    });
+
+    applyFilter();
+  }
+
+  function matchesFilter(det) {
+    // 1. Confidence threshold check
+    const conf = (det.confidence || 0) * 100;
+    if (conf < minConfidenceThreshold) return false;
+
+    // 2. Search query check
+    if (searchQuery) {
+      const name = (det.class_name || "").toLowerCase();
+      const cat = (det.category || "").toLowerCase();
+      const q = searchQuery.toLowerCase();
+      if (!name.includes(q) && !cat.includes(q)) return false;
+    }
+
+    // 3. Category chips check (Union of selected categories)
+    if (activeFilterCategories.has("all")) return true;
+
+    const cat = det.category || "other";
+
+    for (const filterId of activeFilterCategories) {
+      if (filterId === "persons" && cat === "persons") return true;
+      if (filterId === "clothing" && cat === "clothing") return true;
+      if (filterId === "vehicles" && cat === "vehicles") return true;
+      if (filterId === "license_plates" && cat === "license_plates") return true;
+      if (filterId === "animals" && cat === "animals") return true;
+      if (filterId === "other" && cat === "other") return true;
+
+      // Demographic sub-checks
+      if (filterId === "demo_male" && det.demographic_estimate?.presentation === "male") return true;
+      if (filterId === "demo_female" && det.demographic_estimate?.presentation === "female") return true;
+      if (filterId === "demo_unclear" && det.demographic_estimate?.presentation === "unclear") return true;
+    }
+
+    return false;
+  }
+
+  function applyFilter() {
+    let visibleCount = 0;
+    let visibleUncertain = 0;
+    let activeItemVisible = false;
+
+    currentDetections.forEach((det, i) => {
+      const matches = matchesFilter(det);
+      const row = document.getElementById(`det-row-${i}`);
+      const bbox = document.getElementById(`bbox-item-${i}`);
+
+      if (matches) {
+        visibleCount++;
+        if (det.confidence < 0.6) visibleUncertain++;
+        if (activeDetectionIndex === i) activeItemVisible = true;
+
+        if (row) {
+          row.classList.remove("filtered-out");
+          row.style.display = "";
+        }
+        if (bbox) {
+          bbox.classList.remove("filtered-hidden");
+          bbox.classList.remove("filtered-dimmed");
+        }
+      } else {
+        if (row) {
+          row.classList.add("filtered-out");
+          row.style.display = "none";
+        }
+        if (bbox) {
+          if (isDimMode) {
+            bbox.classList.remove("filtered-hidden");
+            bbox.classList.add("filtered-dimmed");
+          } else {
+            bbox.classList.add("filtered-hidden");
+            bbox.classList.remove("filtered-dimmed");
+          }
+        }
+      }
+    });
+
+    // If currently selected detection is filtered out, gracefully reset zoom
+    if (activeDetectionIndex !== null && !activeItemVisible) {
+      resetZoom();
+    }
+
+    // Update Counts & Badges
+    const totalCount = currentDetections.length;
+    const isFiltered = visibleCount !== totalCount || !activeFilterCategories.has("all") || searchQuery || minConfidenceThreshold > 10;
+    
+    if (detectedCountBadge) {
+      if (isFiltered) {
+        detectedCountBadge.innerHTML = `${visibleCount} of ${totalCount} <span class="filtered-indicator-tag">Filtered</span>`;
+      } else {
+        detectedCountBadge.textContent = `${totalCount} ${totalCount === 1 ? 'Object' : 'Objects'}`;
+      }
+    }
+
+    // Update summary strip counts
+    if (aiSummaryStats) {
+      const topClass = analysisData?.classifications && analysisData.classifications.length ? analysisData.classifications[0].class_name : "N/A";
+      aiSummaryStats.innerHTML = `
+        <div class="stat-chip">
+          <span class="stat-chip__label">Showing:</span>
+          <span class="stat-chip__value">${visibleCount} ${isFiltered ? `(${totalCount} total)` : 'Objects'}</span>
+        </div>
+        <div class="stat-chip">
+          <span class="stat-chip__label">Uncertain:</span>
+          <span class="stat-chip__value" style="color:${visibleUncertain > 0 ? 'var(--conf-med-text)' : 'inherit'}">${visibleUncertain}</span>
+        </div>
+        <div class="stat-chip">
+          <span class="stat-chip__label">ViT Scene:</span>
+          <span class="stat-chip__value">${esc(topClass)}</span>
+        </div>
+      `;
+    }
+
+    // Show empty state if 0 visible
+    if (visibleCount === 0) {
+      if (filterEmptyState) filterEmptyState.style.display = "flex";
+      if (detectionsTableContainer) detectionsTableContainer.style.display = "none";
+    } else {
+      if (filterEmptyState) filterEmptyState.style.display = "none";
+      if (detectionsTableContainer) detectionsTableContainer.style.display = "block";
+    }
+  }
+
+  // --- Filter Bar Event Listeners ---
+  if (filterSearchInput) {
+    filterSearchInput.addEventListener("input", (e) => {
+      searchQuery = e.target.value.trim();
+      if (clearSearchBtn) clearSearchBtn.style.display = searchQuery ? "block" : "none";
+      applyFilter();
+    });
+  }
+
+  if (clearSearchBtn) {
+    clearSearchBtn.addEventListener("click", () => {
+      searchQuery = "";
+      if (filterSearchInput) filterSearchInput.value = "";
+      clearSearchBtn.style.display = "none";
+      applyFilter();
+    });
+  }
+
+  if (filterConfidenceSlider) {
+    filterConfidenceSlider.addEventListener("input", (e) => {
+      minConfidenceThreshold = parseInt(e.target.value, 10);
+      if (confSliderValue) confSliderValue.textContent = `${minConfidenceThreshold}%`;
+      applyFilter();
+    });
+  }
+
+  if (dimHideToggle) {
+    dimHideToggle.addEventListener("change", (e) => {
+      isDimMode = e.target.checked;
+      if (dimHideLabel) dimHideLabel.textContent = isDimMode ? "Dim" : "Hide";
+      applyFilter();
+    });
+  }
+
+  if (emptyClearFiltersBtn) {
+    emptyClearFiltersBtn.addEventListener("click", () => {
+      activeFilterCategories.clear();
+      activeFilterCategories.add("all");
+      searchQuery = "";
+      if (filterSearchInput) filterSearchInput.value = "";
+      if (clearSearchBtn) clearSearchBtn.style.display = "none";
+      minConfidenceThreshold = 10;
+      if (filterConfidenceSlider) filterConfidenceSlider.value = 10;
+      if (confSliderValue) confSliderValue.textContent = "10%";
+      renderFilterChips();
+      applyFilter();
+    });
+  }
+
+  // ========================================================================
   //  RENDER DETECTIONS TABLE + SYNCHRONIZED BOUNDING BOXES
   // ========================================================================
   function renderDetectionsTableAndBoxes(detections, imgW, imgH) {
@@ -521,6 +837,9 @@
       const row = document.createElement("tr");
       row.id = `det-row-${i}`;
       row.className = `tier--${tier.tier}`;
+      if (det.parent_index !== null && det.parent_index !== undefined) {
+        row.classList.add("nested-row");
+      }
       row.setAttribute("tabindex", "0");
       row.setAttribute("role", "button");
       row.setAttribute("aria-selected", "false");
@@ -528,6 +847,19 @@
       let uncertainBadge = "";
       if (det.is_uncertain) {
         uncertainBadge = '<span class="badge-uncertain">⚠️ Uncertain</span>';
+      }
+
+      let parentTag = "";
+      if (det.parent_index !== null && det.parent_index !== undefined) {
+        const pType = det.parent_type === "person" ? "Person" : (det.parent_type === "vehicle" ? "Vehicle" : "Parent");
+        parentTag = `<span class="nested-tag">↳ on ${pType} #${det.parent_index + 1}</span>`;
+      }
+
+      let demoTag = "";
+      if (demographicEnabled && det.demographic_estimate) {
+        const pres = det.demographic_estimate.presentation;
+        const icon = pres === "male" ? "👨" : (pres === "female" ? "👩" : "❓");
+        demoTag = `<span class="nested-tag" title="Apparent presentation, approximate">${icon} ${pres}</span>`;
       }
 
       row.innerHTML = `
@@ -538,6 +870,8 @@
             <div class="det-info-wrap">
               <span class="det-name">${esc(det.class_name)}</span>
               ${uncertainBadge}
+              ${parentTag}
+              ${demoTag}
             </div>
           </div>
         </td>
@@ -919,6 +1253,14 @@
       const formData = new FormData();
       formData.append("session_id", currentSessionId);
       formData.append("message", message);
+      
+      // Pass active filter state to chatbot so responses respect the filtered view
+      const filtersState = {
+        categories: Array.from(activeFilterCategories),
+        search_query: searchQuery,
+        min_confidence: minConfidenceThreshold / 100.0,
+      };
+      formData.append("filters_json", JSON.stringify(filtersState));
 
       const res = await fetch("/chat", { method: "POST", body: formData });
       const data = await res.json();
