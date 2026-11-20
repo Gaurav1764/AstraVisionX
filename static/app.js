@@ -76,6 +76,11 @@
   const bboxOverlayContainer    = document.getElementById("bboxOverlayContainer");
   const xaiMethodTabs           = document.querySelectorAll(".xai-tab");
   const currentMethodBadge      = document.getElementById("currentMethodBadge");
+  const activePresetBadge       = document.getElementById("activePresetBadge");
+  const presetSelect            = document.getElementById("presetSelect");
+  const btnScoreInfo            = document.getElementById("btnScoreInfo");
+  const btnCloseScoreInfo       = document.getElementById("btnCloseScoreInfo");
+  const confidenceInfoCollapsible = document.getElementById("confidenceInfoCollapsible");
 
   // --- DOM Refs: Chat Bar & Drawer -----------------------------------------
   const chatFeedDrawer      = document.getElementById("chatFeedDrawer");
@@ -288,6 +293,9 @@
 
     const formData = new FormData();
     formData.append("file", selectedFile);
+    if (presetSelect && presetSelect.value) {
+      formData.append("preset", presetSelect.value);
+    }
 
     try {
       const res = await fetch("/analyze", { method: "POST", body: formData });
@@ -402,6 +410,16 @@
     const count = currentDetections.length;
     detectedCountBadge.textContent = `${count} ${count === 1 ? 'Object' : 'Objects'}`;
     chatSessionIdEl.textContent = `Session: ${data.session_id.substring(0, 8)}…`;
+
+    // Active Preset Badge in YOLO Detections Card Header
+    if (activePresetBadge) {
+      if (data.preset_info?.badge_label) {
+        activePresetBadge.textContent = data.preset_info.badge_label;
+      }
+    }
+    if (presetSelect && data.preset_info?.preset) {
+      presetSelect.value = data.preset_info.preset;
+    }
 
     // Summary Stats Banner
     const uncertainDetections = currentDetections.filter(d => d.confidence < 0.6).length;
@@ -792,6 +810,29 @@
     });
   }
 
+  // Preset Selector change event (auto re-analyzes current image if present)
+  if (presetSelect) {
+    presetSelect.addEventListener("change", () => {
+      if (selectedFile) {
+        analyzeBtn.click();
+      }
+    });
+  }
+
+  // Honest confidence info note toggle
+  if (btnScoreInfo && confidenceInfoCollapsible) {
+    btnScoreInfo.addEventListener("click", () => {
+      const isVisible = confidenceInfoCollapsible.style.display !== "none";
+      confidenceInfoCollapsible.style.display = isVisible ? "none" : "block";
+    });
+  }
+
+  if (btnCloseScoreInfo && confidenceInfoCollapsible) {
+    btnCloseScoreInfo.addEventListener("click", () => {
+      confidenceInfoCollapsible.style.display = "none";
+    });
+  }
+
   // ========================================================================
   //  RENDER DETECTIONS TABLE + SYNCHRONIZED BOUNDING BOXES
   // ========================================================================
@@ -862,6 +903,37 @@
         demoTag = `<span class="nested-tag" title="Apparent presentation, approximate">${icon} ${pres}</span>`;
       }
 
+      // Infer honest reasons for lower confidence scores if applicable
+      let scoreHint = "";
+      if (confNum < 65) {
+        const [bx1, by1, bx2, by2] = det.bbox;
+        const bw = bx2 - bx1;
+        const bh = by2 - by1;
+        const areaFrac = (bw * bh) / ((imgW || 1) * (imgH || 1));
+        
+        // Check if significantly overlapped by another box
+        let isOverlapped = false;
+        detections.forEach((other, oi) => {
+          if (oi !== i && other.confidence >= det.confidence) {
+            const [ox1, oy1, ox2, oy2] = other.bbox;
+            const ix1 = Math.max(bx1, ox1);
+            const iy1 = Math.max(by1, oy1);
+            const ix2 = Math.min(bx2, ox2);
+            const iy2 = Math.min(by2, oy2);
+            if (ix2 > ix1 && iy2 > iy1) {
+              const iArea = (ix2 - ix1) * (iy2 - iy1);
+              if (iArea / (bw * bh) > 0.35) isOverlapped = true;
+            }
+          }
+        });
+
+        if (areaFrac < 0.015) {
+          scoreHint = '<span class="score-factor-hint">Likely lower score: small/distant target</span>';
+        } else if (isOverlapped) {
+          scoreHint = '<span class="score-factor-hint">Likely lower score: partly overlapped/crowded</span>';
+        }
+      }
+
       row.innerHTML = `
         <td class="col-index-cell">${i + 1}</td>
         <td>
@@ -872,6 +944,7 @@
               ${uncertainBadge}
               ${parentTag}
               ${demoTag}
+              ${scoreHint}
             </div>
           </div>
         </td>

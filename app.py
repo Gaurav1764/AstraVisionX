@@ -74,10 +74,13 @@ _gradcam: Optional[GradCamExplainer] = None
 _shap: Optional[ShapExplainer] = None
 _lime: Optional[LimeExplainer] = None
 
-def _get_models():
+def _get_models(preset: Optional[str] = None):
     global _yolo, _vit, _cnn, _gradcam, _shap, _lime
-    if _yolo is None:
-        _yolo = YoloDetector()
+    if preset and _yolo is not None and getattr(_yolo, "preset", None) != preset:
+        # Re-initialize detector with requested preset
+        _yolo = YoloDetector(preset=preset)
+    elif _yolo is None:
+        _yolo = YoloDetector(preset=preset)
     if _vit is None:
         _vit = ViTClassifier()
     if _cnn is None:
@@ -148,12 +151,15 @@ async def health():
 
 
 @app.post("/detect")
-async def detect(file: UploadFile = File(...)):
+async def detect(
+    file: UploadFile = File(...),
+    preset: Optional[str] = Form(None),
+):
     """Upload image → YOLO bounding boxes + class labels + confidence."""
     try:
         contents = await file.read()
         _, image_rgb = _read_image(contents)
-        yolo, _, _, _, _, _ = _get_models()
+        yolo, _, _, _, _, _ = _get_models(preset=preset)
         detections = yolo.detect(image_rgb)
         detections = _relabel_detections(detections)
         filter_meta = enrich_detections(
@@ -171,6 +177,15 @@ async def detect(file: UploadFile = File(...)):
             "demographic_enabled": filter_meta["demographic_enabled"],
             "demographic_counts": filter_meta["demographic_counts"],
             "filter_config": filter_meta["filter_config"],
+            "preset_info": {
+                "preset": yolo.preset,
+                "model_path": yolo.model_path,
+                "imgsz": yolo.imgsz,
+                "iou": yolo.iou,
+                "augment": yolo.augment,
+                "device": yolo.device,
+                "badge_label": f"YOLOv8{'x' if 'yolov8x' in yolo.model_path else ('m' if 'yolov8m' in yolo.model_path else ('n' if 'yolov8n' in yolo.model_path else 's'))} · {yolo.preset.replace('_', ' ').title()} · {yolo.imgsz}px"
+            },
         })
     except Exception as e:
         return JSONResponse({"success": False, "error": str(e)}, status_code=500)
@@ -557,15 +572,19 @@ def _build_confidence_breakdown(detections: list, classifications: list, agreeme
 
 
 @app.post("/analyze")
-async def analyze(file: UploadFile = File(...)):
+async def analyze(
+    file: UploadFile = File(...),
+    preset: Optional[str] = Form(None),
+):
     """
     Full pipeline: detect → classify → default Grad-CAM → Confidence Breakdown.
     Creates a session for conversational Q&A, multi-method XAI, and report generation.
+    Supports selectable inference presets: 'fast', 'balanced', 'high_accuracy'.
     """
     try:
         contents = await file.read()
         pil_image, image_rgb = _read_image(contents)
-        yolo, vit, cnn, gradcam, _, _ = _get_models()
+        yolo, vit, cnn, gradcam, _, _ = _get_models(preset=preset)
 
         # 1. YOLO Detection
         detections = yolo.detect(image_rgb)
@@ -701,6 +720,15 @@ async def analyze(file: UploadFile = File(...)):
             "demographic_enabled": filter_meta["demographic_enabled"],
             "demographic_counts": filter_meta["demographic_counts"],
             "filter_config": filter_meta["filter_config"],
+            "preset_info": {
+                "preset": yolo.preset,
+                "model_path": yolo.model_path,
+                "imgsz": yolo.imgsz,
+                "iou": yolo.iou,
+                "augment": yolo.augment,
+                "device": yolo.device,
+                "badge_label": f"YOLOv8{'x' if 'yolov8x' in yolo.model_path else ('m' if 'yolov8m' in yolo.model_path else ('n' if 'yolov8n' in yolo.model_path else 's'))} · {yolo.preset.replace('_', ' ').title()} · {yolo.imgsz}px"
+            },
         })
 
     except Exception as e:

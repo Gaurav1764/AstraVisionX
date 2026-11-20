@@ -402,10 +402,22 @@
                   </svg>
                 </div>
                 <h2 class="card-header__title" id="imagePanelTitle">YOLO Detections</h2>
+                <span class="active-preset-badge" id="activePresetBadge" title="Current YOLO model variant, resolution, and inference preset">
+                  YOLOv8m · Balanced · 960px
+                </span>
               </div>
               
-              <!-- Right Controls: XAI Method Tabs + Overlay Toggle -->
+              <!-- Right Controls: Preset Selector + XAI Method Tabs + Overlay Toggle -->
               <div class="card-header__controls">
+                <div class="preset-selector-wrap" title="Choose inference quality/speed tradeoff profile">
+                  <label for="presetSelect" class="preset-label">Profile:</label>
+                  <select id="presetSelect" class="preset-dropdown" aria-label="Select quality/speed preset">
+                    <option value="fast">⚡ Fast (Nano, 640px)</option>
+                    <option value="balanced" selected>⚖️ Balanced (Med, 960px)</option>
+                    <option value="high_accuracy">🎯 High Accuracy (XL, TTA)</option>
+                  </select>
+                </div>
+
                 <div class="xai-method-selector" id="xaiMethodSelector" title="Select Explainability Method">
                   <button type="button" class="xai-tab active" data-method="gradcam">Grad-CAM</button>
                   <button type="button" class="xai-tab" data-method="shap">SHAP</button>
@@ -439,12 +451,41 @@
               
               <!-- Color Legend Bar -->
               <div class="viewport-legend">
-                <span class="legend-item"><span class="legend-dot dot--high"></span> ≥80% High</span>
-                <span class="legend-item"><span class="legend-dot dot--med-high"></span> 65-79% Good</span>
-                <span class="legend-item"><span class="legend-dot dot--med"></span> 50-64% Moderate</span>
-                <span class="legend-item"><span class="legend-dot dot--low"></span> &lt;50% Uncertain</span>
-                <span class="legend-divider">|</span>
-                <span class="method-info-badge" id="currentMethodBadge">Grad-CAM Overlay</span>
+                <div class="legend-items-group">
+                  <span class="legend-item"><span class="legend-dot dot--high"></span> ≥80% High</span>
+                  <span class="legend-item"><span class="legend-dot dot--med-high"></span> 65-79% Good</span>
+                  <span class="legend-item"><span class="legend-dot dot--med"></span> 50-64% Moderate</span>
+                  <span class="legend-item"><span class="legend-dot dot--low"></span> &lt;50% Uncertain</span>
+                </div>
+                <div class="legend-actions-group">
+                  <button type="button" class="btn-score-info" id="btnScoreInfo" title="Click to understand model confidence scores honestly">
+                    ℹ️ About confidence scores
+                  </button>
+                  <span class="legend-divider">|</span>
+                  <span class="method-info-badge" id="currentMethodBadge">Grad-CAM Overlay</span>
+                </div>
+              </div>
+
+              <!-- Collapsible Honest Confidence Explanation Note -->
+              <div class="confidence-info-collapsible" id="confidenceInfoCollapsible" style="display: none;">
+                <div class="confidence-info-card">
+                  <div class="info-card-header">
+                    <strong>📖 Understanding YOLO Confidence Scores Honestly</strong>
+                    <button type="button" class="btn-close-info" id="btnCloseScoreInfo">✕</button>
+                  </div>
+                  <p>
+                    • <strong>Model match score, not truth probability:</strong> A YOLO detection confidence reflects how strongly visual features in a proposed box match the trained class representation, not the formal mathematical probability of ground-truth correctness.
+                  </p>
+                  <p>
+                    • <strong>Typical 65% – 90% range:</strong> In crowded, outdoor, or complex natural scenes, valid detections regularly score between 65% and 90%. Scores in this range are normal and expected.
+                  </p>
+                  <p>
+                    • <strong>Why scores drop:</strong> Small or distant objects, partial occlusion/overlap by nearby items, camera blur, or atypical poses naturally reduce boundary activation scores.
+                  </p>
+                  <p>
+                    • <strong>Tiers are guides:</strong> The High (≥80%), Good (65-79%), Moderate (50-64%), and Uncertain (&lt;50%) labels provide consistent operational guidance, but are decision heuristics rather than diagnostic guarantees.
+                  </p>
+                </div>
               </div>
             </div>
           </section>

@@ -1912,3 +1912,134 @@ input {
   color: #92400E;
   margin-left: 6px;
 }
+
+/* ==========================================================================
+   PRESET SELECTOR & HONEST CONFIDENCE INFO COLLAPSIBLE
+   ========================================================================== */
+
+.active-preset-badge {
+  display: inline-flex;
+  align-items: center;
+  padding: 3px 9px;
+  background-color: #F1F5F9;
+  border: 1px solid var(--border-card);
+  border-radius: var(--radius-sm);
+  font-size: 0.72rem;
+  font-weight: 600;
+  color: var(--text-secondary);
+  font-family: var(--font-mono, monospace);
+}
+
+.preset-selector-wrap {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  background-color: var(--bg-card);
+  border: 1px solid var(--border-card);
+  border-radius: var(--radius-sm);
+  padding: 2px 8px;
+}
+
+.preset-label {
+  font-size: 0.74rem;
+  font-weight: 600;
+  color: var(--text-secondary);
+}
+
+.preset-dropdown {
+  border: none;
+  background: transparent;
+  font-size: 0.75rem;
+  font-family: inherit;
+  font-weight: 500;
+  color: var(--text-primary);
+  outline: none;
+  cursor: pointer;
+}
+
+.viewport-legend {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.legend-items-group, .legend-actions-group {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.btn-score-info {
+  background: none;
+  border: none;
+  color: var(--accent-primary);
+  font-size: 0.74rem;
+  font-weight: 600;
+  cursor: pointer;
+  padding: 2px 4px;
+  border-radius: var(--radius-sm);
+  text-decoration: underline;
+  transition: opacity 0.15s ease;
+}
+
+.btn-score-info:hover {
+  opacity: 0.8;
+}
+
+.confidence-info-collapsible {
+  padding: 12px 16px;
+  background-color: #FAFAFC;
+  border-top: 1px solid var(--border-card);
+  animation: fadeInDown 0.2s ease-out;
+}
+
+@keyframes fadeInDown {
+  from { opacity: 0; transform: translateY(-6px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+.confidence-info-card {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  background-color: var(--bg-card);
+  border: 1px solid var(--border-card);
+  border-radius: var(--radius-md);
+  padding: 12px 14px;
+  font-size: 0.75rem;
+  color: var(--text-secondary);
+  line-height: 1.45;
+  box-shadow: var(--card-shadow);
+}
+
+.info-card-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 4px;
+  color: var(--text-primary);
+}
+
+.btn-close-info {
+  background: none;
+  border: none;
+  color: var(--text-muted);
+  font-size: 0.85rem;
+  cursor: pointer;
+  line-height: 1;
+}
+
+.btn-close-info:hover {
+  color: var(--text-primary);
+}
+
+.score-factor-hint {
+  display: inline-block;
+  font-size: 0.65rem;
+  color: var(--text-muted);
+  font-style: italic;
+  margin-top: 2px;
+}

@@ -23,10 +23,19 @@ class Settings(BaseSettings):
     api_port: int = 8000
     
     # Model Settings (Expanded Open Images V7 601-class checkpoint)
-    yolo_model_path: str = "yolov8s-oiv7.pt"
+    yolo_model_path: str = "yolov8m-oiv7.pt"
     vit_model_name: str = "vit_base_patch16_224"
     confidence_threshold: float = 0.60
     detector_conf_threshold: float = 0.10
+    
+    # Inference Optimization & Quality Presets: "fast" | "balanced" | "high_accuracy"
+    inference_preset: str = "balanced"
+    
+    # Advanced Inference Tuning Parameters (overridden by preset if not custom)
+    detector_imgsz: int = 960            # 640 (fast) | 960 (balanced) | 1280 (high_accuracy)
+    detector_iou_threshold: float = 0.55 # NMS IoU threshold (0.55 prevents crowd merging)
+    detector_augment: bool = False       # Test-Time Augmentation (TTA multi-scale)
+    enable_auto_contrast: bool = False   # Gentle CLAHE pre-processing for dark/low-contrast inputs
     
     # Model mode: "general" uses stock ImageNet/COCO models with appropriate caveats.
     # "medical" would use domain-specific checkpoints (not yet available — stubs
