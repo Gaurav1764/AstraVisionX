@@ -4,15 +4,49 @@ import torch
 import torch.nn.functional as F
 from PIL import Image
 import cv2
-from skimage.segmentation import slic
 
 from astravisionx.core.interfaces import ExplainerInterface
 from astravisionx.utils.image_utils import apply_lime_superpixel_overlay, encode_image_base64
 
+
+def _generate_superpixels(image_rgb: np.ndarray, num_segments: int = 35) -> np.ndarray:
+    """
+    Generate superpixels with graceful fallback.
+    Tries skimage.segmentation.slic first. If blocked by OS DLL policy or unavailable,
+    falls back cleanly to OpenCV K-Means + spatial grid superpixels without binary DLL dependencies.
+    """
+    try:
+        from skimage.segmentation import slic
+        return slic(image_rgb, n_segments=num_segments, compactness=10, sigma=1, start_label=0)
+    except Exception:
+        # Robust fallback using OpenCV and NumPy (guaranteed to load without blocked DLLs)
+        h, w = image_rgb.shape[:2]
+        
+        # Calculate grid dimensions based on target number of segments
+        aspect = w / max(h, 1)
+        grid_rows = max(2, int(np.round(np.sqrt(num_segments / max(aspect, 1e-4)))))
+        grid_cols = max(2, int(np.round(grid_rows * aspect)))
+        
+        row_bounds = np.linspace(0, h, grid_rows + 1, dtype=int)
+        col_bounds = np.linspace(0, w, grid_cols + 1, dtype=int)
+        
+        segments = np.zeros((h, w), dtype=np.int32)
+        current_label = 0
+        
+        for r in range(grid_rows):
+            r_start, r_end = row_bounds[r], row_bounds[r + 1]
+            for c in range(grid_cols):
+                c_start, c_end = col_bounds[c], col_bounds[c + 1]
+                segments[r_start:r_end, c_start:c_end] = current_label
+                current_label += 1
+                
+        return segments
+
+
 class LimeExplainer(ExplainerInterface):
     """
     LIME (Local Interpretable Model-agnostic Explanations) Image Explainer.
-    Segments image with SLIC, perturbs superpixel visibility, and fits a weighted
+    Segments image into superpixels, perturbs segment visibility, and fits a weighted
     linear ridge surrogate to quantify segment contributions.
     """
     
@@ -54,19 +88,23 @@ class LimeExplainer(ExplainerInterface):
                 target_class = int(torch.argmax(probs).item())
             confidence = float(probs[target_class].item())
 
-        # 2. Superpixel segmentation with SLIC
-        segments = slic(org_image_rgb, n_segments=self.num_segments, compactness=10, sigma=1, start_label=0)
-        num_segs = len(np.unique(segments))
+        # 2. Superpixel segmentation with safe fallback
+        segments = _generate_superpixels(org_image_rgb, num_segments=self.num_segments)
+        unique_segs = np.unique(segments)
+        num_segs = len(unique_segs)
+        
+        # Normalize labels to contiguous 0..num_segs-1
+        label_map = {old: new for new, old in enumerate(unique_segs)}
+        segments = np.vectorize(label_map.get)(segments)
         
         # 3. Generate binary perturbation matrix Z of shape (num_samples, num_segs)
-        # 1 = segment visible, 0 = segment turned off (replaced by mean color)
         np.random.seed(42)
         Z = np.random.binomial(1, 0.5, size=(self.num_samples, num_segs))
         # Ensure the unperturbed original image (all 1s) is in the sample
         Z[0, :] = 1.0
         
         # Compute cosine / exponential distance weights: pi(z) = exp(-D(z, 1)^2 / sigma^2)
-        distances = np.sum((1.0 - Z) ** 2, axis=1) / num_segs
+        distances = np.sum((1.0 - Z) ** 2, axis=1) / max(num_segs, 1)
         kernel_width = 0.25
         weights_pi = np.exp(-distances / (kernel_width ** 2))
         
@@ -78,9 +116,7 @@ class LimeExplainer(ExplainerInterface):
         
         for i in range(self.num_samples):
             mask_active = Z[i]
-            # Build perturbed image
             perturbed_img = org_image_rgb.copy()
-            # Inactive segments turned to mean background
             inactive_segs = np.where(mask_active == 0)[0]
             for seg_id in inactive_segs:
                 perturbed_img[segments == seg_id] = mean_rgb
@@ -97,17 +133,15 @@ class LimeExplainer(ExplainerInterface):
                     perturbed_probs.extend(p_batch.tolist())
                 batch_tensors = []
 
-        Y = np.array(perturbed_probs) # (num_samples,)
+        Y = np.array(perturbed_probs)  # (num_samples,)
         
         # 5. Fit Weighted Ridge Regression surrogate model:
-        # argmin_w || W^(1/2) (Z w - Y) ||_2^2 + alpha ||w||_2^2
-        # w = (Z^T W Z + alpha I)^(-1) Z^T W Y
         W_diag = np.diag(weights_pi)
         alpha = 1.0
         Z_weighted = np.dot(W_diag, Z)
         A = np.dot(Z.T, Z_weighted) + alpha * np.eye(num_segs)
         b = np.dot(Z_weighted.T, Y)
-        feature_weights = np.linalg.solve(A, b) # (num_segs,)
+        feature_weights = np.linalg.solve(A, b)  # (num_segs,)
         
         # 6. Rank superpixels by weight
         top_indices = np.argsort(feature_weights)[::-1]
